@@ -36,6 +36,23 @@
           <span>🕶️</span> <span class="btn-text">Try Grayscale</span>
         </button>
       </div>
+      <!-- User Profile & Authentication Status Bar -->
+      <div class="user-auth-bar" id="user-auth-bar">
+        <div class="auth-logged-in" id="auth-logged-in" style="display: none;">
+          <span class="user-avatar-tag" id="user-profile-badge">
+            <span class="avatar-icon">👤</span> 
+            <span class="avatar-text"><strong id="logged-user-name">Student</strong> <span id="logged-user-dob" class="user-dob-tag"></span></span>
+          </span>
+          <button id="btn-logout" class="badge-pill logout-btn" title="Log Out and preserve data">
+            <span>🚪 Log Out</span>
+          </button>
+        </div>
+        <div class="auth-logged-out" id="auth-logged-out">
+          <button id="btn-open-login" class="badge-pill login-btn pulse-glow">
+            <span>🔑 Log In (Save My Data)</span>
+          </button>
+        </div>
+      </div>
     </header>
 
     <!-- MAIN SCROLLABLE CONTENT -->
@@ -1053,6 +1070,94 @@
         </button>
         <button class="btn btn-secondary-sm" data-close="modal-printable">
           Close
+        </button>
+      </div>
+  <!-- MODAL 6: SIMPLE LOGIN / PROFILE MODAL (Name, DOB, Password) -->
+  <div class="modal-backdrop" id="modal-login" aria-hidden="true">
+    <div class="modal-dialog card-login washi-tape-top">
+      <div class="washi-tape" style="background-color: rgba(168, 230, 207, 0.85);"></div>
+      <div class="modal-header">
+        <div class="modal-title-group">
+          <span class="modal-icon">🔐</span>
+          <div>
+            <h3>Student Well-Being Pass</h3>
+            <span class="modal-subtitle-sm">Save & preserve all your progress</span>
+          </div>
+        </div>
+        <button class="modal-close-btn" data-close="modal-login" aria-label="Close modal">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <p class="login-intro">
+          Enter your <strong>Name</strong>, <strong>DOB</strong>, and a <strong>Password</strong> to keep your habits, quiz scores, and pledge saved on this device.
+        </p>
+
+        <form id="auth-form" class="auth-card-form" onsubmit="return false;">
+          <div class="form-group">
+            <label for="auth-input-name" class="form-label">
+              <span>👤 Your Full Name or Nickname</span>
+            </label>
+            <input 
+              type="text" 
+              id="auth-input-name" 
+              class="form-input" 
+              placeholder="e.g. Maya Sharma" 
+              required 
+              maxlength="30"
+              autocomplete="name"
+            >
+          </div>
+
+          <div class="form-group">
+            <label for="auth-input-dob" class="form-label">
+              <span>🎂 Date of Birth (DOB)</span>
+            </label>
+            <input 
+              type="date" 
+              id="auth-input-dob" 
+              class="form-input" 
+              required
+              autocomplete="bday"
+            >
+          </div>
+
+          <div class="form-group">
+            <label for="auth-input-password" class="form-label">
+              <span>🔑 Password</span>
+            </label>
+            <div class="password-input-wrap">
+              <input 
+                type="password" 
+                id="auth-input-password" 
+                class="form-input" 
+                placeholder="Enter or create your password" 
+                required 
+                maxlength="50"
+                autocomplete="current-password"
+              >
+              <button type="button" id="btn-toggle-pwd" class="pwd-toggle-btn" title="Show or hide password" aria-label="Toggle password visibility">
+                👁️
+              </button>
+            </div>
+            <span class="field-hint">If this is your first time, this password will protect your journal. If returning, enter your existing password.</span>
+          </div>
+
+          <div id="auth-feedback" class="auth-feedback-box" style="display: none;"></div>
+
+          <button type="submit" id="btn-submit-auth" class="btn btn-yellow btn-full btn-large mt-2">
+            <span>✨ Unlock & Enter My Journal</span>
+          </button>
+        </form>
+
+        <div class="auth-security-note">
+          <span class="shield-icon">🛡️</span>
+          <span>All data is preserved locally in your browser storage. You can log out anytime and switch profiles without losing your progress.</span>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button class="btn btn-secondary-sm btn-full" data-close="modal-login">
+          Continue as Guest
         </button>
       </div>
     </div>

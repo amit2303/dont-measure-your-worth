@@ -2,6 +2,7 @@
  * DON'T MEASURE YOUR WORTH IN LIKES
  * Interactive Mobile Web Application Logic
  * Neo-Brutalism meets Cozy Sketchbook Aesthetic
+ * Includes Simple User Authentication (Name, DOB, Password) & Full Data Preservation
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -156,7 +157,204 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
   /* ==========================================================================
-     3. 60-SECOND DIGITAL WELL-BEING QUIZ
+     3. USER AUTHENTICATION & MULTI-USER DATA PRESERVATION SYSTEM
+     ========================================================================== */
+  class AccountManager {
+    constructor() {
+      this.activeUserKey = localStorage.getItem('worth_active_user_key') || null;
+      this.users = this.getAllUsers();
+    }
+
+    getAllUsers() {
+      try {
+        return JSON.parse(localStorage.getItem('worth_users_db') || '{}');
+      } catch (e) {
+        return {};
+      }
+    }
+
+    saveAllUsers() {
+      localStorage.setItem('worth_users_db', JSON.stringify(this.users));
+    }
+
+    getUserKey(name, dob) {
+      const cleanName = name.trim().toLowerCase().replace(/[^a-z0-9]/g, '');
+      return `${cleanName}_${dob.trim()}`;
+    }
+
+    getActiveUser() {
+      if (!this.activeUserKey) return null;
+      return this.users[this.activeUserKey] || null;
+    }
+
+    login(name, dob, password) {
+      const key = this.getUserKey(name, dob);
+      const existing = this.users[key];
+
+      if (existing) {
+        if (existing.password !== password) {
+          return { success: false, message: 'Password does not match the saved profile for this Name & DOB.' };
+        }
+        this.activeUserKey = key;
+        localStorage.setItem('worth_active_user_key', key);
+        return { success: true, user: existing, isNew: false };
+      } else {
+        // Create new account with preserved data or current session
+        const newUser = {
+          name: name.trim(),
+          dob: dob.trim(),
+          password: password,
+          createdAt: new Date().toISOString(),
+          data: {
+            quizCompleted: localStorage.getItem('worth_quiz_completed') === 'true',
+            quizScore: parseInt(localStorage.getItem('worth_quiz_score') || '0', 10),
+            challengeState: JSON.parse(localStorage.getItem('worth_challenge_state') || '[false,false,false,false,false,false,false]'),
+            dailyMood: localStorage.getItem('worth_daily_mood') || null,
+            hasPledged: localStorage.getItem('worth_has_pledged') === 'true',
+            pledgeHobby: localStorage.getItem('worth_pledge_hobby') || ''
+          }
+        };
+        this.users[key] = newUser;
+        this.saveAllUsers();
+        this.activeUserKey = key;
+        localStorage.setItem('worth_active_user_key', key);
+        return { success: true, user: newUser, isNew: true };
+      }
+    }
+
+    logout() {
+      this.activeUserKey = null;
+      localStorage.removeItem('worth_active_user_key');
+    }
+
+    saveCurrentData(patch) {
+      const active = this.getActiveUser();
+      if (active) {
+        active.data = { ...active.data, ...patch };
+        this.saveAllUsers();
+      }
+    }
+
+    getSavedData(key, fallback) {
+      const active = this.getActiveUser();
+      if (active && active.data && active.data[key] !== undefined) {
+        return active.data[key];
+      }
+      return fallback;
+    }
+  }
+
+  const accountManager = new AccountManager();
+
+  // Auth UI Elements
+  const authLoggedIn = document.getElementById('auth-logged-in');
+  const authLoggedOut = document.getElementById('auth-logged-out');
+  const loggedUserName = document.getElementById('logged-user-name');
+  const loggedUserDob = document.getElementById('logged-user-dob');
+  const btnOpenLogin = document.getElementById('btn-open-login');
+  const btnLogout = document.getElementById('btn-logout');
+  const modalLogin = document.getElementById('modal-login');
+  const authForm = document.getElementById('auth-form');
+  const authInputName = document.getElementById('auth-input-name');
+  const authInputDob = document.getElementById('auth-input-dob');
+  const authInputPassword = document.getElementById('auth-input-password');
+  const btnTogglePwd = document.getElementById('btn-toggle-pwd');
+  const authFeedback = document.getElementById('auth-feedback');
+
+  function updateAuthHeaderUI() {
+    const active = accountManager.getActiveUser();
+    if (active) {
+      authLoggedIn.style.display = 'flex';
+      authLoggedOut.style.display = 'none';
+      loggedUserName.textContent = active.name;
+      // Format DOB nicely (e.g. 2004-05-12 -> 05/12/2004)
+      if (active.dob) {
+        const parts = active.dob.split('-');
+        if (parts.length === 3) {
+          loggedUserDob.textContent = `(${parts[1]}/${parts[2]}/${parts[0]})`;
+        }
+      }
+      // Pre-fill pledge name input
+      const pledgeNameInput = document.getElementById('pledger-name');
+      if (pledgeNameInput && !pledgeNameInput.value) {
+        pledgeNameInput.value = active.name;
+      }
+    } else {
+      authLoggedIn.style.display = 'none';
+      authLoggedOut.style.display = 'block';
+    }
+  }
+
+  if (btnOpenLogin) {
+    btnOpenLogin.addEventListener('click', () => {
+      openModal('modal-login');
+    });
+  }
+
+  if (btnTogglePwd) {
+    btnTogglePwd.addEventListener('click', () => {
+      if (authInputPassword.type === 'password') {
+        authInputPassword.type = 'text';
+        btnTogglePwd.textContent = '🙈';
+      } else {
+        authInputPassword.type = 'password';
+        btnTogglePwd.textContent = '👁️';
+      }
+    });
+  }
+
+  if (authForm) {
+    authForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const name = authInputName.value.trim();
+      const dob = authInputDob.value.trim();
+      const pwd = authInputPassword.value.trim();
+
+      if (!name || !dob || !pwd) {
+        showAuthFeedback('Please enter your Name, Date of Birth, and Password.', 'error');
+        return;
+      }
+
+      const res = accountManager.login(name, dob, pwd);
+      if (!res.success) {
+        sound.playPop();
+        showAuthFeedback(res.message, 'error');
+      } else {
+        sound.playFanfare();
+        const msg = res.isNew 
+          ? `🎉 Welcome, ${res.user.name}! Your private journal has been created.` 
+          : `✨ Welcome back, ${res.user.name}! All your saved progress is restored.`;
+        showAuthFeedback(msg, 'success');
+
+        setTimeout(() => {
+          closeModal('modal-login');
+          updateAuthHeaderUI();
+          syncUIWithActiveUser();
+        }, 1100);
+      }
+    });
+  }
+
+  function showAuthFeedback(msg, type) {
+    authFeedback.textContent = msg;
+    authFeedback.className = `auth-feedback-box ${type}`;
+    authFeedback.style.display = 'block';
+  }
+
+  if (btnLogout) {
+    btnLogout.addEventListener('click', () => {
+      sound.playPop();
+      if (confirm('Log out of this journal session? Your progress remains safely preserved on this device.')) {
+        accountManager.logout();
+        updateAuthHeaderUI();
+        syncUIWithActiveUser();
+      }
+    });
+  }
+
+
+  /* ==========================================================================
+     4. 60-SECOND DIGITAL WELL-BEING QUIZ
      ========================================================================== */
   const quizWrapper = document.getElementById('quiz-questions-wrapper');
   const questionSlides = document.querySelectorAll('.quiz-question-slide');
@@ -175,7 +373,6 @@ document.addEventListener('DOMContentLoaded', () => {
   let totalScore = 0;
   const userAnswers = [];
 
-  // Handle Option Clicks
   const optionButtons = document.querySelectorAll('.quiz-option-btn');
   optionButtons.forEach(btn => {
     btn.addEventListener('click', () => {
@@ -221,21 +418,18 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Calculate Persona Result
     if (totalScore <= 6) {
-      // 4 to 6: Real-Life Champion
       resultBadge.textContent = '🌿 REAL-LIFE CHAMPION';
       resultBadge.style.backgroundColor = 'var(--mint-green)';
       resultEmoji.textContent = '🏆';
       resultTitle.textContent = 'You have Healthy Digital Boundaries!';
       resultDesc.textContent = "Incredible work! You treat your smartphone as an occasional tool rather than a validation metric. You live in the moment with friends, savor real life unfiltered, and don't let algorithms tell you what you're worth.";
     } else if (totalScore <= 9) {
-      // 7 to 9: Mindful Scroller
       resultBadge.textContent = '⚖️ MINDFUL SCROLLER';
       resultBadge.style.backgroundColor = 'var(--highlighter-yellow)';
       resultEmoji.textContent = '📱';
       resultTitle.textContent = 'You are Balancing the Noise, but Watch Out!';
       resultDesc.textContent = "You have solid awareness, but social media comparisons and habitual checking still sneak into your day. Taking a deliberate phone-free meal and unfollowing high-stress accounts will give you an instant mental recharge.";
     } else {
-      // 10 to 12: The Comparison Trap
       resultBadge.textContent = '❤️‍🩹 THE COMPARISON TRAP';
       resultBadge.style.backgroundColor = 'var(--bubblegum-pink)';
       resultBadge.style.color = '#FFFFFF';
@@ -253,9 +447,13 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
-    // Save quiz completed state
+    // Persist in localStorage and active user profile
     localStorage.setItem('worth_quiz_completed', 'true');
     localStorage.setItem('worth_quiz_score', totalScore);
+    accountManager.saveCurrentData({
+      quizCompleted: true,
+      quizScore: totalScore
+    });
   }
 
   if (retakeBtn) {
@@ -286,7 +484,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
   /* ==========================================================================
-     4. 7-DAY SOCIAL MEDIA RESET CHALLENGE (with localStorage persistence)
+     5. 7-DAY SOCIAL MEDIA RESET CHALLENGE (with persistence per user)
      ========================================================================== */
   const taskCheckboxes = document.querySelectorAll('.task-checkbox');
   const completedCountEl = document.getElementById('completed-count');
@@ -308,7 +506,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function loadChecklistState() {
     try {
-      const saved = JSON.parse(localStorage.getItem('worth_challenge_state') || '[]');
+      const fallback = JSON.parse(localStorage.getItem('worth_challenge_state') || '[]');
+      const saved = accountManager.getSavedData('challengeState', fallback);
       taskCheckboxes.forEach((cb, idx) => {
         const isChecked = !!saved[idx];
         cb.checked = isChecked;
@@ -327,6 +526,7 @@ document.addEventListener('DOMContentLoaded', () => {
   function saveChecklistState() {
     const states = Array.from(taskCheckboxes).map(cb => cb.checked);
     localStorage.setItem('worth_challenge_state', JSON.stringify(states));
+    accountManager.saveCurrentData({ challengeState: states });
   }
 
   function updateChecklistProgress(triggerCelebrate = true) {
@@ -385,11 +585,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  loadChecklistState();
-
 
   /* ==========================================================================
-     5. DAILY MOOD LOG / REFLECTION
+     6. DAILY MOOD LOG / REFLECTION (with persistence per user)
      ========================================================================== */
   const moodButtons = document.querySelectorAll('.mood-btn');
   const moodFeedback = document.getElementById('mood-feedback');
@@ -403,10 +601,12 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   function loadSavedMood() {
-    const savedMood = localStorage.getItem('worth_daily_mood');
+    const fallback = localStorage.getItem('worth_daily_mood');
+    const savedMood = accountManager.getSavedData('dailyMood', fallback);
+    moodButtons.forEach(btn => btn.classList.remove('selected'));
     if (savedMood) {
       moodButtons.forEach(btn => {
-        if (btn.getAttribute('data-mood') === savedMood) {
+        if (btn.getAttribute('data-mood') === String(savedMood)) {
           btn.classList.add('selected');
         }
       });
@@ -414,6 +614,8 @@ document.addEventListener('DOMContentLoaded', () => {
         moodFeedback.textContent = moodResponses[savedMood];
         moodFeedback.style.display = 'block';
       }
+    } else {
+      moodFeedback.style.display = 'none';
     }
   }
 
@@ -424,6 +626,7 @@ document.addEventListener('DOMContentLoaded', () => {
       btn.classList.add('selected');
       const moodVal = btn.getAttribute('data-mood');
       localStorage.setItem('worth_daily_mood', moodVal);
+      accountManager.saveCurrentData({ dailyMood: moodVal });
       if (moodResponses[moodVal]) {
         moodFeedback.textContent = moodResponses[moodVal];
         moodFeedback.style.display = 'block';
@@ -431,11 +634,9 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  loadSavedMood();
-
 
   /* ==========================================================================
-     6. THE LIVE "DIGITAL PLEDGE" WALL
+     7. THE LIVE "DIGITAL PLEDGE" WALL (with persistence per user)
      ========================================================================== */
   const pledgeForm = document.getElementById('pledge-form');
   const pledgerNameInput = document.getElementById('pledger-name');
@@ -453,9 +654,10 @@ document.addEventListener('DOMContentLoaded', () => {
   const BASE_PLEDGE_COUNT = 4832;
 
   function loadPledgeState() {
-    const hasPledged = localStorage.getItem('worth_has_pledged') === 'true';
-    const savedName = localStorage.getItem('worth_pledge_name') || '';
-    const savedHobby = localStorage.getItem('worth_pledge_hobby') || '';
+    const active = accountManager.getActiveUser();
+    const hasPledged = active ? (active.data && active.data.hasPledged) : (localStorage.getItem('worth_has_pledged') === 'true');
+    const savedName = active ? active.name : (localStorage.getItem('worth_pledge_name') || '');
+    const savedHobby = active ? (active.data && active.data.pledgeHobby) : (localStorage.getItem('worth_pledge_hobby') || '');
     const pledgeCount = parseInt(localStorage.getItem('worth_pledge_count') || BASE_PLEDGE_COUNT, 10);
 
     pledgeCounterNumber.textContent = pledgeCount.toLocaleString();
@@ -467,9 +669,15 @@ document.addEventListener('DOMContentLoaded', () => {
       signedUserQuote.textContent = savedHobby ? `Favorite offline moment: "${savedHobby}"` : `"I choose real conversations over likes!"`;
       signedDate.textContent = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
-      // Show pinned pill
       userPinnedPledge.style.display = 'flex';
       userPinnedText.innerHTML = `<strong>${savedName}</strong>: ${savedHobby || 'Pledged to live more and compare less!'}`;
+    } else {
+      pledgeForm.style.display = 'flex';
+      pledgeSuccessBox.style.display = 'none';
+      userPinnedPledge.style.display = 'none';
+      if (active && pledgerNameInput) {
+        pledgerNameInput.value = active.name;
+      }
     }
   }
 
@@ -482,7 +690,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
       sound.playFanfare();
 
-      // Confetti Hearts Animation
       if (window.confetti) {
         window.confetti({
           particleCount: 120,
@@ -498,23 +705,24 @@ document.addEventListener('DOMContentLoaded', () => {
       localStorage.setItem('worth_pledge_hobby', hobby);
       localStorage.setItem('worth_pledge_count', currentCount);
 
-      // Animate Counter
+      accountManager.saveCurrentData({
+        hasPledged: true,
+        pledgeHobby: hobby
+      });
+
       pledgeCounterNumber.textContent = currentCount.toLocaleString();
 
-      // Update Badge & UI
       pledgeForm.style.display = 'none';
       pledgeSuccessBox.style.display = 'block';
       signedUserTitle.textContent = `${name}'s Digital Freedom Badge`;
       signedUserQuote.textContent = hobby ? `Favorite offline moment: "${hobby}"` : `"I choose real conversations over likes!"`;
       signedDate.textContent = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
-      // Add to live wall
       userPinnedPledge.style.display = 'flex';
       userPinnedText.innerHTML = `<strong>${name}</strong>: ${hobby || 'Pledged to live more and compare less!'}`;
     });
   }
 
-  // Share / Copy Link
   if (btnSharePledge) {
     btnSharePledge.addEventListener('click', () => {
       sound.playPop();
@@ -528,7 +736,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Save Badge
   if (btnSaveBadge) {
     btnSaveBadge.addEventListener('click', () => {
       sound.playPop();
@@ -536,11 +743,54 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  loadPledgeState();
+
+  /* ==========================================================================
+     8. SYNC ALL UI MODULES WITH ACTIVE USER DATA
+     ========================================================================== */
+  function syncUIWithActiveUser() {
+    loadChecklistState();
+    loadSavedMood();
+    loadPledgeState();
+
+    const active = accountManager.getActiveUser();
+    if (active && active.data && active.data.quizCompleted) {
+      totalScore = active.data.quizScore || 8;
+      quizWrapper.style.display = 'none';
+      resultContainer.style.display = 'block';
+      stepIndicator.textContent = 'Checkup Complete ✨';
+      scoreNumber.textContent = `${totalScore} / 12`;
+      if (totalScore <= 6) {
+        resultBadge.textContent = '🌿 REAL-LIFE CHAMPION';
+        resultBadge.style.backgroundColor = 'var(--mint-green)';
+        resultEmoji.textContent = '🏆';
+        resultTitle.textContent = 'You have Healthy Digital Boundaries!';
+      } else if (totalScore <= 9) {
+        resultBadge.textContent = '⚖️ MINDFUL SCROLLER';
+        resultBadge.style.backgroundColor = 'var(--highlighter-yellow)';
+        resultEmoji.textContent = '📱';
+        resultTitle.textContent = 'You are Balancing the Noise, but Watch Out!';
+      } else {
+        resultBadge.textContent = '❤️‍🩹 THE COMPARISON TRAP';
+        resultBadge.style.backgroundColor = 'var(--bubblegum-pink)';
+        resultBadge.style.color = '#FFFFFF';
+        resultEmoji.textContent = '🫂';
+        resultTitle.textContent = "You're Feeling Burned Out by the Algorithm";
+      }
+    } else {
+      // If quiz not taken by active user or guest
+      resultContainer.style.display = 'none';
+      quizWrapper.style.display = 'block';
+      goToQuestion(1);
+    }
+  }
+
+  // Initial Sync
+  updateAuthHeaderUI();
+  syncUIWithActiveUser();
 
 
   /* ==========================================================================
-     7. BENTO BOX MODALS & INTERACTIVE TOOLS
+     9. BENTO BOX MODALS & INTERACTIVE TOOLS
      ========================================================================== */
   const modalBackdrops = document.querySelectorAll('.modal-backdrop');
   const closeButtons = document.querySelectorAll('[data-close]');
@@ -568,7 +818,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   }
 
-  // Modal Triggers
   document.getElementById('bento-tips')?.addEventListener('click', () => openModal('modal-tips'));
   document.getElementById('bento-tracker')?.addEventListener('click', () => openModal('modal-tracker'));
   document.getElementById('bento-mindfulness')?.addEventListener('click', () => {
@@ -577,7 +826,6 @@ document.addEventListener('DOMContentLoaded', () => {
   });
   document.getElementById('bento-resources')?.addEventListener('click', () => openModal('modal-resources'));
 
-  // Printable Tracker Triggers
   const openPrintableModal = () => openModal('modal-printable');
   document.getElementById('btn-download-tracker')?.addEventListener('click', openPrintableModal);
   document.getElementById('btn-print-from-modal')?.addEventListener('click', () => {
@@ -585,12 +833,10 @@ document.addEventListener('DOMContentLoaded', () => {
     openModal('modal-printable');
   });
 
-  // Print Action
   document.getElementById('btn-trigger-print')?.addEventListener('click', () => {
     window.print();
   });
 
-  // Close Handlers
   closeButtons.forEach(btn => {
     btn.addEventListener('click', () => {
       const targetId = btn.getAttribute('data-close');
@@ -618,7 +864,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
   /* ==========================================================================
-     8. TOOL: SCREEN TIME REALITY CALCULATOR
+     10. TOOL: SCREEN TIME REALITY CALCULATOR
      ========================================================================== */
   const screenSlider = document.getElementById('screentime-slider');
   const sliderHoursVal = document.getElementById('slider-hours-val');
@@ -631,15 +877,12 @@ document.addEventListener('DOMContentLoaded', () => {
   function calculateScreenImpact(hours) {
     sliderHoursVal.textContent = hours.toFixed(1);
 
-    // Days per year (hours * 365 / 24)
     const daysPerYear = (hours * 365) / 24;
     calcDaysYear.textContent = `${daysPerYear.toFixed(1)} Days`;
 
-    // 10 years of waking days
     const yearsInDecade = (daysPerYear * 10) / 365;
     calcDecadeYears.textContent = `${yearsInDecade.toFixed(1)} Full Years`;
 
-    // Equivalent activities (assuming 6 hrs per book)
     const annualTotalHours = hours * 365;
     const books = Math.floor(annualTotalHours / 18);
     const chats = Math.floor(annualTotalHours / 3);
@@ -658,7 +901,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
   /* ==========================================================================
-     9. TOOL: BOX BREATHING PACER & MINDFULNESS TABS
+     11. TOOL: BOX BREATHING PACER & MINDFULNESS TABS
      ========================================================================== */
   const tabBreathing = document.getElementById('tab-btn-breathing');
   const tabGrounding = document.getElementById('tab-btn-grounding');
@@ -752,7 +995,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
   /* ==========================================================================
-     10. STICKY BOTTOM NAVIGATION & SCROLL TRACKING
+     12. STICKY BOTTOM NAVIGATION & SCROLL TRACKING
      ========================================================================== */
   const navItems = document.querySelectorAll('.bottom-nav-bar .nav-item');
   const sections = [
@@ -773,7 +1016,6 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
-  // IntersectionObserver for active tab highlights
   const observerOptions = {
     root: null,
     rootMargin: '-30% 0px -50% 0px',
@@ -801,12 +1043,12 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
   /* ==========================================================================
-     11. FOOTER: RESET ALL LOCAL DATA (For Testing / Fresh Starts)
+     13. FOOTER: RESET ALL LOCAL DATA (For Testing / Fresh Starts)
      ========================================================================== */
   const restartAllBtn = document.getElementById('footer-restart-all');
   if (restartAllBtn) {
     restartAllBtn.addEventListener('click', () => {
-      if (confirm('Clear all locally saved progress (quiz, challenge checkmarks, pledge, and moods)?')) {
+      if (confirm('Clear all locally saved progress and accounts on this device?')) {
         localStorage.clear();
         sound.playPop();
         window.location.reload();
