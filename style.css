@@ -2496,3 +2496,152 @@ body.grayscale-mode {
   flex-shrink: 0;
 }
 
+/* ==========================================================================
+   STUDENT QUICK PASS BANNER & ONBOARDING CARD
+   ========================================================================== */
+.student-pass-banner {
+  background-color: #FFFDF8;
+  border: var(--border-thick);
+  border-radius: var(--border-radius);
+  box-shadow: var(--shadow-flat);
+  padding: 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  position: relative;
+  transition: var(--transition-smooth);
+}
+
+.pass-banner-content {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pass-avatar-wrap {
+  width: 48px;
+  height: 48px;
+  background-color: var(--highlighter-yellow);
+  border: 2px solid var(--ink-black);
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 2px 2px 0px var(--ink-black);
+  flex-shrink: 0;
+}
+
+.pass-icon {
+  font-size: 1.6rem;
+}
+
+.pass-text-group {
+  flex: 1;
+}
+
+.pass-tag {
+  font-family: var(--font-heading);
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  color: #C01452;
+  text-transform: uppercase;
+}
+
+.pass-title {
+  font-family: var(--font-heading);
+  font-size: 1.12rem;
+  font-weight: 800;
+  color: var(--ink-black);
+  line-height: 1.2;
+}
+
+.pass-desc {
+  font-size: 0.78rem;
+  color: #555;
+  line-height: 1.3;
+  margin-top: 2px;
+}
+
+.pass-action-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.pass-status-pill {
+  font-family: var(--font-heading);
+  font-size: 0.78rem;
+  font-weight: 700;
+  background-color: var(--mint-light);
+  border: 1.5px solid #2F6F52;
+  border-radius: var(--border-radius-pill);
+  padding: 4px 10px;
+  color: #124B38;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+/* ==========================================================================
+   MOBILE-FIRST ACCESSIBILITY & TOUCH OPTIMIZATIONS
+   ========================================================================== */
+button, a, input, [role="button"], label {
+  touch-action: manipulation; /* Eliminate 300ms mobile click delay */
+}
+
+/* Minimum 44px touch targets on mobile interactive controls */
+.btn, .quiz-option-btn, .check-item-card, .mood-btn, .nav-item {
+  min-height: 44px;
+}
+
+/* Prevent auto-zooming on focus in iOS Mobile Safari */
+.form-input {
+  font-size: 16px !important;
+}
+
+/* Mobile responsive layout fixes */
+@media (max-width: 480px) {
+  .app-container {
+    padding-bottom: 96px; /* Ensure content is never obscured by bottom bar */
+  }
+
+  .campaign-header {
+    padding: 6px 10px;
+  }
+
+  .banner-ribbon {
+    font-size: 0.72rem;
+    padding: 2px 10px;
+  }
+
+  .likes-block-word .char {
+    width: 38px;
+    height: 46px;
+    font-size: 1.85rem;
+  }
+
+  .bento-grid {
+    gap: 10px;
+  }
+
+  .bento-card {
+    min-height: 130px;
+    padding: 12px 10px;
+  }
+}
+
+@media (max-width: 360px) {
+  .bento-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .likes-block-word .char {
+    width: 32px;
+    height: 40px;
+    font-size: 1.6rem;
+  }
+}
+
+

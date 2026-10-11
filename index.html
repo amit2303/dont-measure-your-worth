@@ -60,6 +60,29 @@
       
       <!-- ================= SECTION A: HERO & 60-SEC QUIZ ================= -->
       <section id="section-home" class="app-section section-hero">
+
+        <!-- Student Pass Banner: Start Saved Flow -->
+        <div class="card student-pass-banner washi-tape-top" id="student-pass-banner">
+          <div class="washi-tape" style="background-color: rgba(255, 230, 109, 0.9);"></div>
+          <div class="pass-banner-content">
+            <div class="pass-avatar-wrap">
+              <span class="pass-icon" id="pass-banner-icon">🪪</span>
+            </div>
+            <div class="pass-text-group">
+              <div class="pass-tag" id="pass-banner-tag">STUDENT DIGITAL PASS</div>
+              <h3 class="pass-title" id="pass-banner-title">Start Your Journal Saved</h3>
+              <p class="pass-desc" id="pass-banner-desc">Enter Name, DOB & Password to save your 7-day challenge, mood reflection & pledge across visits.</p>
+            </div>
+          </div>
+          <div class="pass-action-row" id="pass-action-row">
+            <button type="button" id="btn-banner-login" class="btn btn-sm btn-yellow">
+              <span>🔑 Log In / Create Pass</span>
+            </button>
+            <button type="button" id="btn-banner-guest" class="btn btn-sm btn-white">
+              <span>Explore as Guest ➔</span>
+            </button>
+          </div>
+        </div>
         
         <!-- Hero Sticker Card -->
         <div class="card hero-card washi-tape-top">
@@ -1146,6 +1169,10 @@
 
           <button type="submit" id="btn-submit-auth" class="btn btn-yellow btn-full btn-large mt-2">
             <span>✨ Unlock & Enter My Journal</span>
+          </button>
+
+          <button type="button" id="btn-reset-profile-pwd" class="btn-text-link mt-2" style="display: none; width: 100%; text-align: center; font-size: 0.75rem;">
+            ⚠️ Forgot password? Reset password for this profile
           </button>
         </form>
 

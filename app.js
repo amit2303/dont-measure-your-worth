@@ -281,6 +281,14 @@ document.addEventListener('DOMContentLoaded', () => {
     authInputDob.max = new Date().toISOString().split('T')[0];
   }
 
+  // Banner Elements
+  const passBannerIcon = document.getElementById('pass-banner-icon');
+  const passBannerTag = document.getElementById('pass-banner-tag');
+  const passBannerTitle = document.getElementById('pass-banner-title');
+  const passBannerDesc = document.getElementById('pass-banner-desc');
+  const passActionRow = document.getElementById('pass-action-row');
+  const btnResetProfilePwd = document.getElementById('btn-reset-profile-pwd');
+
   function updateAuthHeaderUI() {
     const active = accountManager.getActiveUser();
     if (active) {
@@ -297,15 +305,57 @@ document.addEventListener('DOMContentLoaded', () => {
       if (pledgeNameInput && !pledgeNameInput.value) {
         pledgeNameInput.value = active.name;
       }
+
+      // Update Student Pass Card in Home Section
+      if (passBannerTitle && passBannerDesc && passActionRow) {
+        if (passBannerIcon) passBannerIcon.textContent = '🌟';
+        if (passBannerTag) passBannerTag.textContent = 'AUTHENTICATED STUDENT PASS';
+        passBannerTitle.textContent = `Welcome, ${active.name}! ✨`;
+        passBannerDesc.textContent = 'Your private journal is active. All habits, mood logs, and pledge are auto-saved on this device.';
+        passActionRow.innerHTML = `
+          <span class="pass-status-pill">💾 Auto-saving active</span>
+          <button type="button" id="btn-banner-logout" class="btn btn-sm btn-pink">
+            <span>🚪 Log Out</span>
+          </button>
+        `;
+        document.getElementById('btn-banner-logout')?.addEventListener('click', triggerLogout);
+      }
     } else {
       authLoggedIn.style.display = 'none';
       authLoggedOut.style.display = 'block';
+
+      // Update Student Pass Card to Guest Prompt
+      if (passBannerTitle && passBannerDesc && passActionRow) {
+        if (passBannerIcon) passBannerIcon.textContent = '🪪';
+        if (passBannerTag) passBannerTag.textContent = 'STUDENT DIGITAL PASS';
+        passBannerTitle.textContent = 'Start Your Journal Saved';
+        passBannerDesc.textContent = 'Enter Name, DOB & Password to save your 7-day challenge, mood reflection & pledge across visits.';
+        passActionRow.innerHTML = `
+          <button type="button" id="btn-banner-login" class="btn btn-sm btn-yellow">
+            <span>🔑 Log In / Create Pass</span>
+          </button>
+          <button type="button" id="btn-banner-guest" class="btn btn-sm btn-white">
+            <span>Explore as Guest ➔</span>
+          </button>
+        `;
+        document.getElementById('btn-banner-login')?.addEventListener('click', () => {
+          authFeedback.style.display = 'none';
+          if (btnResetProfilePwd) btnResetProfilePwd.style.display = 'none';
+          openModal('modal-login');
+          setTimeout(() => authInputName?.focus(), 300);
+        });
+        document.getElementById('btn-banner-guest')?.addEventListener('click', () => {
+          sound.playPop();
+          document.getElementById('section-quiz')?.scrollIntoView({ behavior: 'smooth' });
+        });
+      }
     }
   }
 
   if (btnOpenLogin) {
     btnOpenLogin.addEventListener('click', () => {
       authFeedback.style.display = 'none';
+      if (btnResetProfilePwd) btnResetProfilePwd.style.display = 'none';
       openModal('modal-login');
       setTimeout(() => authInputName.focus(), 300);
     });
@@ -322,6 +372,8 @@ document.addEventListener('DOMContentLoaded', () => {
       }
     });
   }
+
+  let lastFailedLoginAttempt = null;
 
   if (authForm) {
     authForm.addEventListener('submit', (e) => {
@@ -348,9 +400,12 @@ document.addEventListener('DOMContentLoaded', () => {
       const res = accountManager.login(name, dob, pwd, guestSnapshot);
       if (!res.success) {
         sound.playPop();
+        lastFailedLoginAttempt = { name, dob };
         showAuthFeedback(res.message, 'error');
+        if (btnResetProfilePwd) btnResetProfilePwd.style.display = 'block';
       } else {
         sound.playFanfare();
+        if (btnResetProfilePwd) btnResetProfilePwd.style.display = 'none';
         const msg = res.isNew 
           ? `🎉 Welcome, ${res.user.name}! Your private journal has been created.` 
           : `✨ Welcome back, ${res.user.name}! All your saved progress is restored.`;
@@ -365,21 +420,47 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
+  if (btnResetProfilePwd) {
+    btnResetProfilePwd.addEventListener('click', () => {
+      if (!lastFailedLoginAttempt) return;
+      const newPwd = prompt(`Set a new password for ${lastFailedLoginAttempt.name}:`);
+      if (newPwd && newPwd.trim().length >= 3) {
+        const key = accountManager.getUserKey(lastFailedLoginAttempt.name, lastFailedLoginAttempt.dob);
+        if (accountManager.users[key]) {
+          accountManager.users[key].password = newPwd.trim();
+          accountManager.saveAllUsers();
+          authInputPassword.value = newPwd.trim();
+          accountManager.login(lastFailedLoginAttempt.name, lastFailedLoginAttempt.dob, newPwd.trim());
+          sound.playFanfare();
+          showAuthFeedback(`Password updated! Welcome back, ${lastFailedLoginAttempt.name}!`, 'success');
+          btnResetProfilePwd.style.display = 'none';
+          setTimeout(() => {
+            closeModal('modal-login');
+            updateAuthHeaderUI();
+            syncUIWithActiveUser();
+          }, 900);
+        }
+      }
+    });
+  }
+
   function showAuthFeedback(msg, type) {
     authFeedback.textContent = msg;
     authFeedback.className = `auth-feedback-box ${type}`;
     authFeedback.style.display = 'block';
   }
 
+  function triggerLogout() {
+    sound.playPop();
+    if (confirm('Log out of this journal session? Your progress remains safely preserved on this device.')) {
+      accountManager.logout();
+      updateAuthHeaderUI();
+      syncUIWithActiveUser();
+    }
+  }
+
   if (btnLogout) {
-    btnLogout.addEventListener('click', () => {
-      sound.playPop();
-      if (confirm('Log out of this journal session? Your progress remains safely preserved on this device.')) {
-        accountManager.logout();
-        updateAuthHeaderUI();
-        syncUIWithActiveUser();
-      }
-    });
+    btnLogout.addEventListener('click', triggerLogout);
   }
 
 
@@ -1088,7 +1169,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
   /* ==========================================================================
-     13. FOOTER: RESET ALL LOCAL DATA (For Testing / Fresh Starts)
+     13. SMOOTH ANCHOR SCROLLING WITH AUDIO FEEDBACK
+     ========================================================================== */
+  document.querySelectorAll('a[href^="#"]').forEach(anchor => {
+    anchor.addEventListener('click', (e) => {
+      const targetId = anchor.getAttribute('href').substring(1);
+      if (!targetId) return;
+      const targetEl = document.getElementById(targetId);
+      if (targetEl) {
+        e.preventDefault();
+        sound.playPop();
+        targetEl.scrollIntoView({ behavior: 'smooth' });
+      }
+    });
+  });
+
+  /* ==========================================================================
+     14. FOOTER: RESET ALL LOCAL DATA (For Testing / Fresh Starts)
      ========================================================================== */
   const restartAllBtn = document.getElementById('footer-restart-all');
   if (restartAllBtn) {
