@@ -48,7 +48,7 @@
           </button>
         </div>
         <div class="auth-logged-out" id="auth-logged-out">
-          <button id="btn-open-login" class="badge-pill login-btn pulse-glow">
+          <button id="btn-open-login" class="badge-pill login-btn pulse-glow" data-open="modal-login" type="button" aria-label="Open Login Modal">
             <span>🔑 Log In (Save My Data)</span>
           </button>
         </div>
@@ -75,7 +75,7 @@
             </div>
           </div>
           <div class="pass-action-row" id="pass-action-row">
-            <button type="button" id="btn-banner-login" class="btn btn-sm btn-yellow">
+            <button type="button" id="btn-banner-login" class="btn btn-sm btn-yellow" data-open="modal-login">
               <span>🔑 Log In / Create Pass</span>
             </button>
             <button type="button" id="btn-banner-guest" class="btn btn-sm btn-white">
@@ -1095,6 +1095,9 @@
           Close
         </button>
       </div>
+    </div>
+  </div>
+
   <!-- MODAL 6: SIMPLE LOGIN / PROFILE MODAL (Name, DOB, Password) -->
   <div class="modal-backdrop" id="modal-login" aria-hidden="true">
     <div class="modal-dialog card-login washi-tape-top">

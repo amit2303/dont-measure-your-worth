@@ -970,6 +970,26 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  // Delegated Global Modal Open Handler (Ensures all buttons with data-open open 100% reliably)
+  document.addEventListener('click', (e) => {
+    const trigger = e.target.closest('[data-open]');
+    if (trigger) {
+      const modalId = trigger.getAttribute('data-open');
+      if (modalId) {
+        e.preventDefault();
+        sound.playPop();
+        if (modalId === 'modal-login') {
+          if (authFeedback) authFeedback.style.display = 'none';
+          if (btnResetProfilePwd) btnResetProfilePwd.style.display = 'none';
+        }
+        openModal(modalId);
+        if (modalId === 'modal-login') {
+          setTimeout(() => authInputName?.focus(), 300);
+        }
+      }
+    }
+  });
+
   modalBackdrops.forEach(backdrop => {
     backdrop.addEventListener('click', (e) => {
       if (e.target === backdrop) {
