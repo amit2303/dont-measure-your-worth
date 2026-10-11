@@ -2,7 +2,7 @@
  * DON'T MEASURE YOUR WORTH IN LIKES
  * Interactive Mobile Web Application Logic
  * Neo-Brutalism meets Cozy Sketchbook Aesthetic
- * Includes Simple User Authentication (Name, DOB, Password) & Full Data Preservation
+ * Includes Simple User Authentication (Name, DOB, Password) & Full Per-User Data Preservation
  */
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -187,7 +187,7 @@ document.addEventListener('DOMContentLoaded', () => {
       return this.users[this.activeUserKey] || null;
     }
 
-    login(name, dob, password) {
+    login(name, dob, password, guestSnapshot = null) {
       const key = this.getUserKey(name, dob);
       const existing = this.users[key];
 
@@ -199,19 +199,19 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.setItem('worth_active_user_key', key);
         return { success: true, user: existing, isNew: false };
       } else {
-        // Create new account with preserved data or current session
+        // Create new account profile
         const newUser = {
           name: name.trim(),
           dob: dob.trim(),
           password: password,
           createdAt: new Date().toISOString(),
           data: {
-            quizCompleted: localStorage.getItem('worth_quiz_completed') === 'true',
-            quizScore: parseInt(localStorage.getItem('worth_quiz_score') || '0', 10),
-            challengeState: JSON.parse(localStorage.getItem('worth_challenge_state') || '[false,false,false,false,false,false,false]'),
-            dailyMood: localStorage.getItem('worth_daily_mood') || null,
-            hasPledged: localStorage.getItem('worth_has_pledged') === 'true',
-            pledgeHobby: localStorage.getItem('worth_pledge_hobby') || ''
+            quizCompleted: guestSnapshot ? (guestSnapshot.quizCompleted || false) : false,
+            quizScore: guestSnapshot ? (guestSnapshot.quizScore || 0) : 0,
+            challengeState: guestSnapshot && guestSnapshot.challengeState ? guestSnapshot.challengeState : [false, false, false, false, false, false, false],
+            dailyMood: guestSnapshot ? (guestSnapshot.dailyMood || null) : null,
+            hasPledged: guestSnapshot ? (guestSnapshot.hasPledged || false) : false,
+            pledgeHobby: guestSnapshot ? (guestSnapshot.pledgeHobby || '') : ''
           }
         };
         this.users[key] = newUser;
@@ -225,6 +225,13 @@ document.addEventListener('DOMContentLoaded', () => {
     logout() {
       this.activeUserKey = null;
       localStorage.removeItem('worth_active_user_key');
+      // Clear guest session so screen is clean for next person
+      localStorage.removeItem('worth_guest_challenge_state');
+      localStorage.removeItem('worth_guest_daily_mood');
+      localStorage.removeItem('worth_guest_quiz_completed');
+      localStorage.removeItem('worth_guest_quiz_score');
+      localStorage.removeItem('worth_guest_has_pledged');
+      localStorage.removeItem('worth_guest_pledge_hobby');
     }
 
     saveCurrentData(patch) {
@@ -232,15 +239,23 @@ document.addEventListener('DOMContentLoaded', () => {
       if (active) {
         active.data = { ...active.data, ...patch };
         this.saveAllUsers();
+      } else {
+        // Save to guest session
+        if (patch.challengeState !== undefined) {
+          localStorage.setItem('worth_guest_challenge_state', JSON.stringify(patch.challengeState));
+        }
+        if (patch.dailyMood !== undefined) {
+          localStorage.setItem('worth_guest_daily_mood', patch.dailyMood);
+        }
+        if (patch.quizCompleted !== undefined) {
+          localStorage.setItem('worth_guest_quiz_completed', String(patch.quizCompleted));
+          localStorage.setItem('worth_guest_quiz_score', String(patch.quizScore || 0));
+        }
+        if (patch.hasPledged !== undefined) {
+          localStorage.setItem('worth_guest_has_pledged', String(patch.hasPledged));
+          localStorage.setItem('worth_guest_pledge_hobby', patch.pledgeHobby || '');
+        }
       }
-    }
-
-    getSavedData(key, fallback) {
-      const active = this.getActiveUser();
-      if (active && active.data && active.data[key] !== undefined) {
-        return active.data[key];
-      }
-      return fallback;
     }
   }
 
@@ -261,20 +276,23 @@ document.addEventListener('DOMContentLoaded', () => {
   const btnTogglePwd = document.getElementById('btn-toggle-pwd');
   const authFeedback = document.getElementById('auth-feedback');
 
+  // Restrict DOB to max today
+  if (authInputDob) {
+    authInputDob.max = new Date().toISOString().split('T')[0];
+  }
+
   function updateAuthHeaderUI() {
     const active = accountManager.getActiveUser();
     if (active) {
       authLoggedIn.style.display = 'flex';
       authLoggedOut.style.display = 'none';
       loggedUserName.textContent = active.name;
-      // Format DOB nicely (e.g. 2004-05-12 -> 05/12/2004)
       if (active.dob) {
         const parts = active.dob.split('-');
         if (parts.length === 3) {
           loggedUserDob.textContent = `(${parts[1]}/${parts[2]}/${parts[0]})`;
         }
       }
-      // Pre-fill pledge name input
       const pledgeNameInput = document.getElementById('pledger-name');
       if (pledgeNameInput && !pledgeNameInput.value) {
         pledgeNameInput.value = active.name;
@@ -287,7 +305,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
   if (btnOpenLogin) {
     btnOpenLogin.addEventListener('click', () => {
+      authFeedback.style.display = 'none';
       openModal('modal-login');
+      setTimeout(() => authInputName.focus(), 300);
     });
   }
 
@@ -315,7 +335,17 @@ document.addEventListener('DOMContentLoaded', () => {
         return;
       }
 
-      const res = accountManager.login(name, dob, pwd);
+      // Snapshot any guest progress on screen to carry into new account
+      const guestSnapshot = {
+        quizCompleted: document.getElementById('quiz-result-container').style.display !== 'none',
+        quizScore: totalScore,
+        challengeState: Array.from(document.querySelectorAll('.task-checkbox')).map(cb => cb.checked),
+        dailyMood: document.querySelector('.mood-btn.selected')?.getAttribute('data-mood') || null,
+        hasPledged: document.getElementById('pledge-signed-success').style.display !== 'none',
+        pledgeHobby: document.getElementById('pledger-hobby')?.value.trim() || ''
+      };
+
+      const res = accountManager.login(name, dob, pwd, guestSnapshot);
       if (!res.success) {
         sound.playPop();
         showAuthFeedback(res.message, 'error');
@@ -330,7 +360,7 @@ document.addEventListener('DOMContentLoaded', () => {
           closeModal('modal-login');
           updateAuthHeaderUI();
           syncUIWithActiveUser();
-        }, 1100);
+        }, 900);
       }
     });
   }
@@ -416,7 +446,6 @@ document.addEventListener('DOMContentLoaded', () => {
     stepIndicator.textContent = 'Checkup Complete ✨';
     scoreNumber.textContent = `${totalScore} / 12`;
 
-    // Calculate Persona Result
     if (totalScore <= 6) {
       resultBadge.textContent = '🌿 REAL-LIFE CHAMPION';
       resultBadge.style.backgroundColor = 'var(--mint-green)';
@@ -447,9 +476,6 @@ document.addEventListener('DOMContentLoaded', () => {
       });
     }
 
-    // Persist in localStorage and active user profile
-    localStorage.setItem('worth_quiz_completed', 'true');
-    localStorage.setItem('worth_quiz_score', totalScore);
     accountManager.saveCurrentData({
       quizCompleted: true,
       quizScore: totalScore
@@ -506,8 +532,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function loadChecklistState() {
     try {
-      const fallback = JSON.parse(localStorage.getItem('worth_challenge_state') || '[]');
-      const saved = accountManager.getSavedData('challengeState', fallback);
+      const active = accountManager.getActiveUser();
+      const saved = active && active.data && active.data.challengeState
+        ? active.data.challengeState
+        : JSON.parse(localStorage.getItem('worth_guest_challenge_state') || '[false,false,false,false,false,false,false]');
+
       taskCheckboxes.forEach((cb, idx) => {
         const isChecked = !!saved[idx];
         cb.checked = isChecked;
@@ -525,7 +554,6 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function saveChecklistState() {
     const states = Array.from(taskCheckboxes).map(cb => cb.checked);
-    localStorage.setItem('worth_challenge_state', JSON.stringify(states));
     accountManager.saveCurrentData({ challengeState: states });
   }
 
@@ -601,8 +629,11 @@ document.addEventListener('DOMContentLoaded', () => {
   };
 
   function loadSavedMood() {
-    const fallback = localStorage.getItem('worth_daily_mood');
-    const savedMood = accountManager.getSavedData('dailyMood', fallback);
+    const active = accountManager.getActiveUser();
+    const savedMood = active && active.data && active.data.dailyMood
+      ? active.data.dailyMood
+      : localStorage.getItem('worth_guest_daily_mood');
+
     moodButtons.forEach(btn => btn.classList.remove('selected'));
     if (savedMood) {
       moodButtons.forEach(btn => {
@@ -625,7 +656,6 @@ document.addEventListener('DOMContentLoaded', () => {
       moodButtons.forEach(b => b.classList.remove('selected'));
       btn.classList.add('selected');
       const moodVal = btn.getAttribute('data-mood');
-      localStorage.setItem('worth_daily_mood', moodVal);
       accountManager.saveCurrentData({ dailyMood: moodVal });
       if (moodResponses[moodVal]) {
         moodFeedback.textContent = moodResponses[moodVal];
@@ -655,9 +685,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
   function loadPledgeState() {
     const active = accountManager.getActiveUser();
-    const hasPledged = active ? (active.data && active.data.hasPledged) : (localStorage.getItem('worth_has_pledged') === 'true');
-    const savedName = active ? active.name : (localStorage.getItem('worth_pledge_name') || '');
-    const savedHobby = active ? (active.data && active.data.pledgeHobby) : (localStorage.getItem('worth_pledge_hobby') || '');
+    const hasPledged = active 
+      ? (active.data && active.data.hasPledged) 
+      : (localStorage.getItem('worth_guest_has_pledged') === 'true');
+    const savedName = active ? active.name : (localStorage.getItem('worth_guest_pledge_name') || '');
+    const savedHobby = active 
+      ? (active.data && active.data.pledgeHobby) 
+      : (localStorage.getItem('worth_guest_pledge_hobby') || '');
     const pledgeCount = parseInt(localStorage.getItem('worth_pledge_count') || BASE_PLEDGE_COUNT, 10);
 
     pledgeCounterNumber.textContent = pledgeCount.toLocaleString();
@@ -677,7 +711,10 @@ document.addEventListener('DOMContentLoaded', () => {
       userPinnedPledge.style.display = 'none';
       if (active && pledgerNameInput) {
         pledgerNameInput.value = active.name;
+      } else if (pledgerNameInput) {
+        pledgerNameInput.value = '';
       }
+      if (pledgerHobbyInput) pledgerHobbyInput.value = '';
     }
   }
 
@@ -700,17 +737,19 @@ document.addEventListener('DOMContentLoaded', () => {
       }
 
       const currentCount = parseInt(localStorage.getItem('worth_pledge_count') || BASE_PLEDGE_COUNT, 10) + 1;
-      localStorage.setItem('worth_has_pledged', 'true');
-      localStorage.setItem('worth_pledge_name', name);
-      localStorage.setItem('worth_pledge_hobby', hobby);
       localStorage.setItem('worth_pledge_count', currentCount);
+      pledgeCounterNumber.textContent = currentCount.toLocaleString();
 
       accountManager.saveCurrentData({
         hasPledged: true,
         pledgeHobby: hobby
       });
 
-      pledgeCounterNumber.textContent = currentCount.toLocaleString();
+      if (!accountManager.getActiveUser()) {
+        localStorage.setItem('worth_guest_has_pledged', 'true');
+        localStorage.setItem('worth_guest_pledge_name', name);
+        localStorage.setItem('worth_guest_pledge_hobby', hobby);
+      }
 
       pledgeForm.style.display = 'none';
       pledgeSuccessBox.style.display = 'block';
@@ -753,8 +792,15 @@ document.addEventListener('DOMContentLoaded', () => {
     loadPledgeState();
 
     const active = accountManager.getActiveUser();
-    if (active && active.data && active.data.quizCompleted) {
-      totalScore = active.data.quizScore || 8;
+    const quizDone = active 
+      ? (active.data && active.data.quizCompleted) 
+      : (localStorage.getItem('worth_guest_quiz_completed') === 'true');
+
+    if (quizDone) {
+      totalScore = active 
+        ? (active.data.quizScore || 8) 
+        : parseInt(localStorage.getItem('worth_guest_quiz_score') || '8', 10);
+
       quizWrapper.style.display = 'none';
       resultContainer.style.display = 'block';
       stepIndicator.textContent = 'Checkup Complete ✨';
@@ -777,7 +823,6 @@ document.addEventListener('DOMContentLoaded', () => {
         resultTitle.textContent = "You're Feeling Burned Out by the Algorithm";
       }
     } else {
-      // If quiz not taken by active user or guest
       resultContainer.style.display = 'none';
       quizWrapper.style.display = 'block';
       goToQuestion(1);
